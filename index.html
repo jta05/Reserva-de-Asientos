@@ -130,7 +130,8 @@
         </div>
     </div>
 
-    <script>const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbw2bzzH8L-kqrB8tiFrE5ee0KcqGj9JvZZe6ugWHUsNkKhMrNoZIvLsXoUIBxDNlWzd/exec";
+    <script>
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbw2bzzH8L-kqrB8tiFrE5ee0KcqGj9JvZZe6ugWHUsNkKhMrNoZIvLsXoUIBxDNlWzd/exec";
 
         document.addEventListener("DOMContentLoaded", () => {
             const bIzquierdo = document.getElementById('bloqueIzquierdo');
@@ -149,33 +150,7 @@
             };
             const letrasFilas = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
 
-            // 1. Generar los asientos físicamente en la pantalla de inmediato
-            generarBloque(bIzquierdo, configSala.izquierdo, 'IZQ');
-            generarBloque(bCentral, configSala.central, 'CEN');
-            generarBloque(bDerecho, configSala.derecho, 'DER');
-
-            // 2. CONSULTA INICIAL DE ASIENTOS OCUPADOS USANDO JSONP
-            const inicialCallbackName = 'callbackCargaAsientos';
-            window[inicialCallbackName] = function(asientosOcupados) {
-                if (Array.isArray(asientosOcupados)) {
-                    asientosOcupados.forEach(asientoId => {
-                        const asientoBloqueado = document.querySelector(`[data-id="${asientoId}"]`);
-                        if (asientoBloqueado) {
-                            asientoBloqueado.classList.remove('selected');
-                            asientoBloqueado.classList.add('blocked');
-                        }
-                    });
-                }
-                // Limpieza del script temporal de carga
-                document.body.removeChild(scriptCarga);
-                delete window[inicialCallbackName];
-            };
-
-            const scriptCarga = document.createElement('script');
-            scriptCarga.src = `${WEB_APP_URL}?callback=${inicialCallbackName}`;
-            document.body.appendChild(scriptCarga);
-
-
+            // 1. Definición estructurada de la función de dibujo
             function generarBloque(contenedor, estructuraAsientos, prefijoBloque) {
                 estructuraAsientos.forEach((numAsientos, indexFila) => {
                     const letraFila = letrasFilas[indexFila];
@@ -215,7 +190,34 @@
                 });
             }
 
-            // 3. ENVÍO DE RESERVAS USANDO JSONP
+            // 2. Pintar físicamente los bloques en la web de inmediato
+            generarBloque(bIzquierdo, configSala.izquierdo, 'IZQ');
+            generarBloque(bCentral, configSala.central, 'CEN');
+            generarBloque(bDerecho, configSala.derecho, 'DER');
+
+            // 3. Sincronizar en segundo plano los asientos ya ocupados mediante JSONP
+            const inicialCallbackName = 'callbackCargaAsientos';
+            window[inicialCallbackName] = function(asientosOcupados) {
+                if (Array.isArray(asientosOcupados)) {
+                    asientosOcupados.forEach(asientoId => {
+                        const asientoBloqueado = document.querySelector(`[data-id="${asientoId}"]`);
+                        if (asientoBloqueado) {
+                            asientoBloqueado.classList.remove('selected');
+                            asientoBloqueado.classList.add('blocked');
+                        }
+                    });
+                }
+                const scriptCargaExiste = document.getElementById('scriptTemporalCarga');
+                if (scriptCargaExiste) document.body.removeChild(scriptCargaExiste);
+                delete window[inicialCallbackName];
+            };
+
+            const scriptCarga = document.createElement('script');
+            scriptCarga.id = 'scriptTemporalCarga';
+            scriptCarga.src = `${WEB_APP_URL}?callback=${inicialCallbackName}`;
+            document.body.appendChild(scriptCarga);
+
+            // 4. Procesar el formulario de reservas de forma segura por JSONP
             formReserva.addEventListener('submit', (e) => {
                 e.preventDefault();
                 btnEnviar.innerText = "Procesando...";
@@ -243,27 +245,30 @@
                         btnEnviar.innerText = "Confirmar Reserva";
                         btnEnviar.disabled = false;
                     }
-                    document.body.removeChild(scriptJsonp);
+                    const scriptEnvioExiste = document.getElementById('scriptTemporalEnvio');
+                    if (scriptEnvioExiste) document.body.removeChild(scriptEnvioExiste);
                     delete window[callbackName];
                 };
 
                 const urlConParametros = `${WEB_APP_URL}?nombre=${nombre}&correo=${correo}&asiento=${asiento}&callback=${callbackName}`;
 
                 const scriptJsonp = document.createElement('script');
+                scriptJsonp.id = 'scriptTemporalEnvio';
                 scriptJsonp.src = urlConParametros;
                 
                 scriptJsonp.onerror = function() {
                     alert("Hubo un problema de conexión con el servidor.");
                     btnEnviar.innerText = "Confirmar Reserva";
                     btnEnviar.disabled = false;
-                    document.body.removeChild(scriptJsonp);
+                    const scriptEnvioExiste = document.getElementById('scriptTemporalEnvio');
+                    if (scriptEnvioExiste) document.body.removeChild(scriptEnvioExiste);
                     delete window[callbackName];
                 };
 
                 document.body.appendChild(scriptJsonp);
             });
         });
-            });
     </script>
 </body>
+</html>
 </html>
