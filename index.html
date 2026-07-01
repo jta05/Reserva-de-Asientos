@@ -131,7 +131,6 @@
     </div>
 
     <script>
-        // ⚠️ REEMPLAZA ESTA URL CON LA TUYA DE GOOGLE APPS SCRIPT
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwnbUsheXoXIPnjDjq_mOtrLtwtZX-QlOIesyYGi8Bls-baduuBxlazSp6waFiXrE6F/exec";
 
         document.addEventListener("DOMContentLoaded", () => {
@@ -151,22 +150,25 @@
             };
             const letrasFilas = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
 
-            // 1. Cargar asientos ya bloqueados desde Google Sheets
+            // Generar los asientos en blanco de inmediato
+            generarBloque(bIzquierdo, configSala.izquierdo, 'IZQ');
+            generarBloque(bCentral, configSala.central, 'CEN');
+            generarBloque(bDerecho, configSala.derecho, 'DER');
+
+            // Consultar a la base de datos para bloquear los que ya están ocupados
             fetch(WEB_APP_URL)
                 .then(res => res.json())
                 .then(asientosOcupados => {
-                    generarBloque(bIzquierdo, configSala.izquierdo, 'IZQ', asientosOcupados);
-                    generarBloque(bCentral, configSala.central, 'CEN', asientosOcupados);
-                    generarBloque(bDerecho, configSala.derecho, 'DER', asientosOcupados);
+                    asientosOcupados.forEach(asientoId => {
+                        const asientoBloqueado = document.querySelector(`[data-id="${asientoId}"]`);
+                        if (asientoBloqueado) {
+                            asientoBloqueado.classList.add('blocked');
+                        }
+                    });
                 })
-                .catch(err => {
-                    console.error("Error cargando asientos ocupados, cargando vacíos...", err);
-                    generarBloque(bIzquierdo, configSala.izquierdo, 'IZQ', []);
-                    generarBloque(bCentral, configSala.central, 'CEN', []);
-                    generarBloque(bDerecho, configSala.derecho, 'DER', []);
-                });
+                .catch(err => console.error("Error al sincronizar con Google Sheets:", err));
 
-            function generarBloque(contenedor, estructuraAsientos, prefijoBloque, ocupados) {
+            function generarBloque(contenedor, estructuraAsientos, prefijoBloque) {
                 estructuraAsientos.forEach((numAsientos, indexFila) => {
                     const letraFila = letrasFilas[indexFila];
                     const filaElemento = document.createElement('div');
@@ -179,15 +181,9 @@
                         asiento.innerText = `${letraFila}${i}`; 
                         asiento.dataset.id = asientoId;
 
-                        // Si ya está guardado en el Excel, se bloquea
-                        if (ocupados.includes(asientoId)) {
-                            asiento.classList.add('blocked');
-                        }
-
                         asiento.addEventListener('click', () => {
                             if (asiento.classList.contains('blocked')) return;
 
-                            // Permitir seleccionar solo uno a la vez
                             if (asientoActual && asientoActual !== asiento) {
                                 asientoActual.classList.remove('selected');
                             }
@@ -211,33 +207,31 @@
                 });
             }
 
-            // 2. Enviar datos del formulario a Google Sheets
+            // Envío compatible con No-CORS (URLSearchParams)
             formReserva.addEventListener('submit', (e) => {
                 e.preventDefault();
                 btnEnviar.innerText = "Procesando...";
                 btnEnviar.disabled = true;
 
-                const datos = {
-                    nombre: document.getElementById('nombre').value,
-                    correo: document.getElementById('correo').value,
-                    asiento: inputAsiento.value
-                };
+                const formData = new URLSearchParams();
+                formData.append('nombre', document.getElementById('nombre').value);
+                formData.append('correo', document.getElementById('correo').value);
+                formData.append('asiento', inputAsiento.value);
 
                 fetch(WEB_APP_URL, {
                     method: 'POST',
-                    mode: 'no-cors', // Necesario para evitar problemas de CORS con Apps Script
+                    mode: 'no-cors',
                     cache: 'no-cache',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(datos)
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData.toString()
                 }).then(() => {
                     alert("¡Reserva confirmada exitosamente!");
-                    // Bloquear el asiento localmente de inmediato
                     asientoActual.classList.remove('selected');
                     asientoActual.classList.add('blocked');
                     formReserva.reset();
                     btnEnviar.innerText = "Confirmar Reserva";
                 }).catch(err => {
-                    alert("Hubo un problema al guardar la reserva.");
+                    alert("Hubo un problema al procesar la solicitud.");
                     btnEnviar.innerText = "Confirmar Reserva";
                     btnEnviar.disabled = false;
                 });
