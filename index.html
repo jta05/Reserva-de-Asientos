@@ -162,6 +162,7 @@
                     asientosOcupados.forEach(asientoId => {
                         const asientoBloqueado = document.querySelector(`[data-id="${asientoId}"]`);
                         if (asientoBloqueado) {
+                            asientoBloqueado.classList.remove('selected');
                             asientoBloqueado.classList.add('blocked');
                         }
                     });
@@ -207,16 +208,16 @@
                 });
             }
 
-            // Envío compatible con No-CORS (URLSearchParams)
+            // Envío compatible con x-www-form-urlencoded sin espacios extraños
             formReserva.addEventListener('submit', (e) => {
                 e.preventDefault();
                 btnEnviar.innerText = "Procesando...";
                 btnEnviar.disabled = true;
 
                 const formData = new URLSearchParams();
-                formData.append('nombre', document.getElementById('nombre').value);
-                formData.append('correo', document.getElementById('correo').value);
-                formData.append('asiento', inputAsiento.value);
+                formData.append('nombre', document.getElementById('nombre').value.trim());
+                formData.append('correo', document.getElementById('correo').value.trim());
+                formData.append('asiento', inputAsiento.value.trim());
 
                 fetch(WEB_APP_URL, {
                     method: 'POST',
@@ -226,10 +227,14 @@
                     body: formData.toString()
                 }).then(() => {
                     alert("¡Reserva confirmada exitosamente!");
-                    asientoActual.classList.remove('selected');
-                    asientoActual.classList.add('blocked');
+                    if (asientoActual) {
+                        asientoActual.classList.remove('selected');
+                        asientoActual.classList.add('blocked');
+                    }
                     formReserva.reset();
                     btnEnviar.innerText = "Confirmar Reserva";
+                    btnEnviar.disabled = true;
+                    asientoActual = null;
                 }).catch(err => {
                     alert("Hubo un problema al procesar la solicitud.");
                     btnEnviar.innerText = "Confirmar Reserva";
