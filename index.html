@@ -209,22 +209,23 @@
             }
 
             // Envío compatible con x-www-form-urlencoded sin espacios extraños
+            // Envío infalible inyectando parámetros en la URL
             formReserva.addEventListener('submit', (e) => {
                 e.preventDefault();
                 btnEnviar.innerText = "Procesando...";
                 btnEnviar.disabled = true;
 
-                const formData = new URLSearchParams();
-                formData.append('nombre', document.getElementById('nombre').value.trim());
-                formData.append('correo', document.getElementById('correo').value.trim());
-                formData.append('asiento', inputAsiento.value.trim());
+                const nombre = encodeURIComponent(document.getElementById('nombre').value.trim());
+                const correo = encodeURIComponent(document.getElementById('correo').value.trim());
+                const asiento = encodeURIComponent(inputAsiento.value.trim());
 
-                fetch(WEB_APP_URL, {
+                // Adjuntamos los datos directamente en la URL para obligar a Google a leerlos
+                const urlConParametros = `${WEB_APP_URL}?nombre=${nombre}&correo=${correo}&asiento=${asiento}`;
+
+                fetch(urlConParametros, {
                     method: 'POST',
                     mode: 'no-cors',
-                    cache: 'no-cache',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: formData.toString()
+                    cache: 'no-cache'
                 }).then(() => {
                     alert("¡Reserva confirmada exitosamente!");
                     if (asientoActual) {
