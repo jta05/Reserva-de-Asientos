@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reserva de Asientos - Auditorio</title>
+    <style>
+        body {
+            background-color: #0f0f11;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .auditorio-container {
+            text-align: center;
+            background: #16161a;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            max-width: 1100px;
+            width: 100%;
+        }
+
+        .escenario {
+            width: 60%;
+            margin: 0 auto 40px auto;
+            background: #3a3f58;
+            color: #fff;
+            padding: 12px;
+            font-weight: bold;
+            letter-spacing: 3px;
+            border-radius: 0 0 15px 15px;
+        }
+
+        .distribucion-sala {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .bloque { display: flex; flex-direction: column; gap: 8px; }
+        #bloqueCentral { align-items: center; }
+        #bloqueIzquierdo { align-items: flex-end; }
+        #bloqueDerecho { align-items: flex-start; }
+        .pasillo { width: 35px; }
+
+        .fila { display: flex; gap: 6px; justify-content: center; }
+
+        .asiento {
+            background-color: #2b5c8f;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px 6px 2px 2px;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s ease;
+            border-bottom: 3px solid #1a3a5c;
+        }
+
+        .asiento:hover { transform: scale(1.1); }
+        .asiento.selected { background-color: #2ecc71; border-bottom: 3px solid #27ae60; }
+        .asiento.blocked { background-color: #3d4146; border-bottom: 3px solid #282a2d; color: #7f8c8d; cursor: not-allowed; pointer-events: none; }
+
+        /* Formulario de registro */
+        .formulario-reserva {
+            background: #202024;
+            padding: 25px;
+            border-radius: 10px;
+            max-width: 450px;
+            margin: 20px auto 0 auto;
+            text-align: left;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .formulario-reserva h3 { margin-top: 0; color: #2ecc71; text-align: center; }
+
+        .campo { margin-bottom: 15px; }
+        .campo label { display: block; margin-bottom: 5px; font-size: 14px; color: #b3b3b3; }
+        .campo input { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #3a3a42; background: #16161a; color: white; box-sizing: border-box; }
+        
+        .btn-enviar { width: 100%; padding: 12px; background: #2ecc71; border: none; border-radius: 5px; color: white; font-weight: bold; font-size: 16px; cursor: pointer; transition: background 0.2s; }
+        .btn-enviar:hover { background: #27ae60; }
+        .btn-enviar:disabled { background: #555; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+    <div class="auditorio-container">
+        <div class="escenario">ESCENARIO / PANTALLA</div>
+        
+        <div class="distribucion-sala">
+            <div class="bloque" id="bloqueIzquierdo"></div>
+            <div class="pasillo"></div>
+            <div class="bloque" id="bloqueCentral"></div>
+            <div class="pasillo"></div>
+            <div class="bloque" id="bloqueDerecho"></div>
+        </div>
+
+        <div class="formulario-reserva">
+            <h3>Formulario de Reserva</h3>
+            <form id="formReserva">
+                <div class="campo">
+                    <label for="nombre">Nombre Completo:</label>
+                    <input type="text" id="nombre" required placeholder="Ej. Juan Pérez">
+                </div>
+                <div class="campo">
+                    <label for="correo">Correo Electrónico:</label>
+                    <input type="email" id="correo" required placeholder="ejemplo@correo.com">
+                </div>
+                <div class="campo">
+                    <label for="asientoSeleccionado">Asiento Seleccionado:</label>
+                    <input type="text" id="asientoSeleccionado" readonly required placeholder="Haz clic en un asiento de arriba">
+                </div>
+                <button type="submit" class="btn-enviar" id="btnEnviar" disabled>Confirmar Reserva</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ⚠️ REEMPLAZA ESTA URL CON LA TUYA DE GOOGLE APPS SCRIPT
+        const WEB_APP_URL = "https://script.google.com/a/macros/unitru.edu.pe/s/AKfycbzeI_UnZRxcv8-tFowhlYbpR2R0NxCNHqNrISj7TTGpIpLqvAdYDvFp_ScuhXJgb6OJ/exec";
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const bIzquierdo = document.getElementById('bloqueIzquierdo');
+            const bCentral = document.getElementById('bloqueCentral');
+            const bDerecho = document.getElementById('bloqueDerecho');
+            const inputAsiento = document.getElementById('asientoSeleccionado');
+            const btnEnviar = document.getElementById('btnEnviar');
+            const formReserva = document.getElementById('formReserva');
+
+            let asientoActual = null;
+
+            const configSala = {
+                central:   [4, 5, 6, 7, 8, 9, 10, 11, 11, 12, 12], 
+                izquierdo: [3, 4, 4, 5, 5, 6,  6,  7,  7,  8,  8],
+                derecho:   [3, 4, 4, 5, 5, 6,  6,  7,  7,  8,  8]
+            };
+            const letrasFilas = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
+
+            // 1. Cargar asientos ya bloqueados desde Google Sheets
+            fetch(WEB_APP_URL)
+                .then(res => res.json())
+                .then(asientosOcupados => {
+                    generarBloque(bIzquierdo, configSala.izquierdo, 'IZQ', asientosOcupados);
+                    generarBloque(bCentral, configSala.central, 'CEN', asientosOcupados);
+                    generarBloque(bDerecho, configSala.derecho, 'DER', asientosOcupados);
+                })
+                .catch(err => {
+                    console.error("Error cargando asientos ocupados, cargando vacíos...", err);
+                    generarBloque(bIzquierdo, configSala.izquierdo, 'IZQ', []);
+                    generarBloque(bCentral, configSala.central, 'CEN', []);
+                    generarBloque(bDerecho, configSala.derecho, 'DER', []);
+                });
+
+            function generarBloque(contenedor, estructuraAsientos, prefijoBloque, ocupados) {
+                estructuraAsientos.forEach((numAsientos, indexFila) => {
+                    const letraFila = letrasFilas[indexFila];
+                    const filaElemento = document.createElement('div');
+                    filaElemento.classList.add('fila');
+                    
+                    for (let i = 1; i <= numAsientos; i++) {
+                        const asientoId = `${prefijoBloque}-${letraFila}${i}`;
+                        const asiento = document.createElement('div');
+                        asiento.classList.add('asiento');
+                        asiento.innerText = `${letraFila}${i}`; 
+                        asiento.dataset.id = asientoId;
+
+                        // Si ya está guardado en el Excel, se bloquea
+                        if (ocupados.includes(asientoId)) {
+                            asiento.classList.add('blocked');
+                        }
+
+                        asiento.addEventListener('click', () => {
+                            if (asiento.classList.contains('blocked')) return;
+
+                            // Permitir seleccionar solo uno a la vez
+                            if (asientoActual && asientoActual !== asiento) {
+                                asientoActual.classList.remove('selected');
+                            }
+
+                            asiento.classList.toggle('selected');
+
+                            if (asiento.classList.contains('selected')) {
+                                asientoActual = asiento;
+                                inputAsiento.value = asientoId;
+                                btnEnviar.disabled = false;
+                            } else {
+                                asientoActual = null;
+                                inputAsiento.value = "";
+                                btnEnviar.disabled = true;
+                            }
+                        });
+
+                        filaElemento.appendChild(asiento);
+                    }
+                    contenedor.appendChild(filaElemento);
+                });
+            }
+
+            // 2. Enviar datos del formulario a Google Sheets
+            formReserva.addEventListener('submit', (e) => {
+                e.preventDefault();
+                btnEnviar.innerText = "Procesando...";
+                btnEnviar.disabled = true;
+
+                const datos = {
+                    nombre: document.getElementById('nombre').value,
+                    correo: document.getElementById('correo').value,
+                    asiento: inputAsiento.value
+                };
+
+                fetch(WEB_APP_URL, {
+                    method: 'POST',
+                    mode: 'no-cors', // Necesario para evitar problemas de CORS con Apps Script
+                    cache: 'no-cache',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(datos)
+                }).then(() => {
+                    alert("¡Reserva confirmada exitosamente!");
+                    // Bloquear el asiento localmente de inmediato
+                    asientoActual.classList.remove('selected');
+                    asientoActual.classList.add('blocked');
+                    formReserva.reset();
+                    btnEnviar.innerText = "Confirmar Reserva";
+                }).catch(err => {
+                    alert("Hubo un problema al guardar la reserva.");
+                    btnEnviar.innerText = "Confirmar Reserva";
+                    btnEnviar.disabled = false;
+                });
+            });
+        });
+    </script>
+</body>
+</html>
