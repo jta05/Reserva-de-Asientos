@@ -211,6 +211,7 @@
             // Envío compatible con x-www-form-urlencoded sin espacios extraños
             // Envío infalible inyectando parámetros en la URL
             // Envío nativo por GET para saltar las restricciones de CORS
+            // Envío definitivo usando JSONP (Esquiva 100% las restricciones de CORS)
             formReserva.addEventListener('submit', (e) => {
                 e.preventDefault();
                 btnEnviar.innerText = "Procesando...";
@@ -220,16 +221,12 @@
                 const correo = encodeURIComponent(document.getElementById('correo').value.trim());
                 const asiento = encodeURIComponent(inputAsiento.value.trim());
 
-                // Al ser una petición GET, los datos viajan de forma transparente y segura para el navegador
-                const urlConParametros = `${WEB_APP_URL}?nombre=${nombre}&correo=${correo}&asiento=${asiento}`;
+                // Creamos un nombre único para la función que recibirá la respuesta de Google
+                const callbackName = 'googleSheetsCallback_' + Math.floor(Math.random() * 100000);
 
-                fetch(urlConParametros, {
-                    method: 'GET',
-                    mode: 'cors' // Cambiado a 'cors' ya que Apps Script acepta GET con redirección perfectamente
-                })
-                .then(res => res.json())
-                .then(resultado => {
-                    if (resultado.status === "success") {
+                // Definimos la función globalmente para que Google la pueda ejecutar
+                window[callbackName] = function(resultado) {
+                    if (resultado && resultado.status === "success") {
                         alert("¡Reserva confirmada exitosamente!");
                         if (asientoActual) {
                             asientoActual.classList.remove('selected');
@@ -244,21 +241,29 @@
                         btnEnviar.innerText = "Confirmar Reserva";
                         btnEnviar.disabled = false;
                     }
-                })
-                .catch(err => {
-                    // Nota: A veces Google redirige y puede saltar al catch aunque sí guarde los datos. 
-                    // Para dar una excelente experiencia al usuario, asumimos éxito si el flujo fue continuo:
-                    alert("¡Petición procesada! Verifica tu hoja de cálculo.");
-                    if (asientoActual) {
-                        asientoActual.classList.remove('selected');
-                        asientoActual.classList.add('blocked');
-                    }
-                    formReserva.reset();
+                    // Limpieza del elemento script creado
+                    document.body.removeChild(scriptJsonp);
+                    delete window[callbackName];
+                };
+
+                // Construimos la URL agregando el parámetro "callback"
+                const urlConParametros = `${WEB_APP_URL}?nombre=${nombre}&correo=${correo}&asiento=${asiento}&callback=${callbackName}`;
+
+                // Inyectamos un elemento <script> para hacer la petición de manera nativa
+                const scriptJsonp = document.createElement('script');
+                scriptJsonp.src = urlConParametros;
+                
+                // Si hay un error crítico de red
+                scriptJsonp.onerror = function() {
+                    alert("Hubo un problema de conexión con el servidor.");
                     btnEnviar.innerText = "Confirmar Reserva";
-                    btnEnviar.disabled = true;
-                    asientoActual = null;
-                });
-            });z        });
+                    btnEnviar.disabled = false;
+                    document.body.removeChild(scriptJsonp);
+                    delete window[callbackName];
+                };
+
+                document.body.appendChild(scriptJsonp);
+            });
     </script>
 </body>
 </html>
