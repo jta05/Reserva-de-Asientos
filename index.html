@@ -130,8 +130,7 @@
         </div>
     </div>
 
-    <script>
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbw2bzzH8L-kqrB8tiFrE5ee0KcqGj9JvZZe6ugWHUsNkKhMrNoZIvLsXoUIBxDNlWzd/exec";
+    <script>const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbw2bzzH8L-kqrB8tiFrE5ee0KcqGj9JvZZe6ugWHUsNkKhMrNoZIvLsXoUIBxDNlWzd/exec";
 
         document.addEventListener("DOMContentLoaded", () => {
             const bIzquierdo = document.getElementById('bloqueIzquierdo');
@@ -150,15 +149,15 @@
             };
             const letrasFilas = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
 
-            // Generar los asientos en blanco de inmediato
+            // 1. Generar los asientos físicamente en la pantalla de inmediato
             generarBloque(bIzquierdo, configSala.izquierdo, 'IZQ');
             generarBloque(bCentral, configSala.central, 'CEN');
             generarBloque(bDerecho, configSala.derecho, 'DER');
 
-            // Consultar a la base de datos para bloquear los que ya están ocupados
-            fetch(WEB_APP_URL)
-                .then(res => res.json())
-                .then(asientosOcupados => {
+            // 2. CONSULTA INICIAL DE ASIENTOS OCUPADOS USANDO JSONP
+            const inicialCallbackName = 'callbackCargaAsientos';
+            window[inicialCallbackName] = function(asientosOcupados) {
+                if (Array.isArray(asientosOcupados)) {
                     asientosOcupados.forEach(asientoId => {
                         const asientoBloqueado = document.querySelector(`[data-id="${asientoId}"]`);
                         if (asientoBloqueado) {
@@ -166,8 +165,16 @@
                             asientoBloqueado.classList.add('blocked');
                         }
                     });
-                })
-                .catch(err => console.error("Error al sincronizar con Google Sheets:", err));
+                }
+                // Limpieza del script temporal de carga
+                document.body.removeChild(scriptCarga);
+                delete window[inicialCallbackName];
+            };
+
+            const scriptCarga = document.createElement('script');
+            scriptCarga.src = `${WEB_APP_URL}?callback=${inicialCallbackName}`;
+            document.body.appendChild(scriptCarga);
+
 
             function generarBloque(contenedor, estructuraAsientos, prefijoBloque) {
                 estructuraAsientos.forEach((numAsientos, indexFila) => {
@@ -208,10 +215,7 @@
                 });
             }
 
-            // Envío compatible con x-www-form-urlencoded sin espacios extraños
-            // Envío infalible inyectando parámetros en la URL
-            // Envío nativo por GET para saltar las restricciones de CORS
-            // Envío definitivo usando JSONP (Esquiva 100% las restricciones de CORS)
+            // 3. ENVÍO DE RESERVAS USANDO JSONP
             formReserva.addEventListener('submit', (e) => {
                 e.preventDefault();
                 btnEnviar.innerText = "Procesando...";
@@ -221,10 +225,8 @@
                 const correo = encodeURIComponent(document.getElementById('correo').value.trim());
                 const asiento = encodeURIComponent(inputAsiento.value.trim());
 
-                // Creamos un nombre único para la función que recibirá la respuesta de Google
                 const callbackName = 'googleSheetsCallback_' + Math.floor(Math.random() * 100000);
 
-                // Definimos la función globalmente para que Google la pueda ejecutar
                 window[callbackName] = function(resultado) {
                     if (resultado && resultado.status === "success") {
                         alert("¡Reserva confirmada exitosamente!");
@@ -241,19 +243,15 @@
                         btnEnviar.innerText = "Confirmar Reserva";
                         btnEnviar.disabled = false;
                     }
-                    // Limpieza del elemento script creado
                     document.body.removeChild(scriptJsonp);
                     delete window[callbackName];
                 };
 
-                // Construimos la URL agregando el parámetro "callback"
                 const urlConParametros = `${WEB_APP_URL}?nombre=${nombre}&correo=${correo}&asiento=${asiento}&callback=${callbackName}`;
 
-                // Inyectamos un elemento <script> para hacer la petición de manera nativa
                 const scriptJsonp = document.createElement('script');
                 scriptJsonp.src = urlConParametros;
                 
-                // Si hay un error crítico de red
                 scriptJsonp.onerror = function() {
                     alert("Hubo un problema de conexión con el servidor.");
                     btnEnviar.innerText = "Confirmar Reserva";
@@ -263,6 +261,8 @@
                 };
 
                 document.body.appendChild(scriptJsonp);
+            });
+        });
             });
     </script>
 </body>
